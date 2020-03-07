@@ -91,10 +91,10 @@ def train_dcgan(args, noise_dim=96):
             noise_input = sample_noise(batch_size, noise_dim, dtype=real_data.dtype, device=real_data.device)
             fake_image = DC_Gen(noise_input)
             logits_fake = DC_Disc(fake_image)
-            logits_real = DC_Disc(imgs.to(device))
+            logits_real = DC_Disc(real_data)
 
             optimizer_Dis.zero_grad()
-            D_loss = discriminator_loss(logits_real, logits_fake)
+            D_loss = discriminator_loss(logits_real, logits_fake, dtype=dtype, device=device)
             D_loss.backward()
             optimizer_Dis.step()
 
@@ -104,7 +104,7 @@ def train_dcgan(args, noise_dim=96):
             logits_fake = DC_Disc(fake_image)
 
             optimizer_Gen.zero_grad()
-            G_loss = generator_loss(logits_fake)
+            G_loss = generator_loss(logits_fake, dtype=dtype, device=device)
             G_loss.backward()
             optimizer_Gen.step()
 
