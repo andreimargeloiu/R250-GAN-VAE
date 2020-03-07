@@ -4,6 +4,7 @@ import random
 import IPython
 import signal
 
+import numpy as np
 import torch
 import torchvision
 
@@ -29,7 +30,7 @@ def get_dataset_iterator(batch_size=128):
                                                 shuffle=True,
                                                 drop_last=True,
                                                 num_workers=2)
-    return iter(mnist_batched) 
+    return iter(mnist_batched)
 
 
 ## Utilities
@@ -82,6 +83,7 @@ def fix_random_seed(seed_no=0):
     torch.manual_seed(seed_no)
     torch.cuda.manual_seed(seed_no)
     random.seed(seed_no)
+    np.random.seed(seed_no)
 
 
 def show_images_square(images, cmap='gray'):
