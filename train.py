@@ -71,9 +71,8 @@ def train_dcgan(args, noise_dim=96):
     optimizer_Gen = create_optimizer(DC_Gen)
     optimizer_Dis = create_optimizer(DC_Disc)
 
-    no_epochs = 5
     iter_count = 0
-    show_every = 1
+    show_every = 50
     batch_size = 128
     noise_for_images_to_show = sample_noise(16, noise_dim, dtype=dtype, device=device)
 

@@ -76,7 +76,7 @@ class DC_Discriminator(nn.Module):
         return self.model(x)
 
 
-def sample_noise(batch_size, dim, dtype=torch.float, device='cpu'):
+def sample_noise(batch_size, dim, dtype, device):
     """
     Generate a PyTorch tensor of uniform random noise.
 
@@ -89,7 +89,7 @@ def sample_noise(batch_size, dim, dtype=torch.float, device='cpu'):
     return torch.rand([batch_size, dim], dtype=dtype, device=device) * 2 - 1
 
 
-def discriminator_loss(logits_real, logits_fake, dtype=torch.float, device='cpu'):
+def discriminator_loss(logits_real, logits_fake, dtype, device):
     """
     Computes the discriminator loss described above.
 
@@ -107,7 +107,7 @@ def discriminator_loss(logits_real, logits_fake, dtype=torch.float, device='cpu'
     return loss
 
 
-def generator_loss(logits_fake, dtype=torch.float, device='cpu'):
+def generator_loss(logits_fake, dtype, device):
     """
     Computes the generator loss described above.
 

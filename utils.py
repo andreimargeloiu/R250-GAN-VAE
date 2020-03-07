@@ -29,7 +29,7 @@ def get_dataset_iterator(batch_size=128):
                                                 shuffle=True,
                                                 drop_last=True,
                                                 num_workers=2)
-    return iter(mnist_batched)
+    return iter(mnist_batched) 
 
 
 ## Utilities
@@ -100,7 +100,6 @@ def show_images_square(images, cmap='gray'):
         ax.set_yticklabels([])
         ax.set_aspect('equal')
         plt.imshow(img.reshape([sqrtimg, sqrtimg]), cmap=cmap)
-    plt.show()
     return
 
 
