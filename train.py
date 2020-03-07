@@ -58,9 +58,10 @@ def run(args):
 
 
 def create_optimizer(model):
-    return torch.optim.Adam(model.parameters(), lr=0.01, betas=(0.5, 0.999))
+    return torch.optim.Adam(model.parameters(), lr=1e-3, betas=(0.5, 0.999))
 
 def train_dcgan(args, noise_dim=96):
+    fix_random_seed(0)
     # Create models and initialize weights
     DC_Gen = DC_Generator(noise_dim).to(device)
     DC_Gen.apply(initialize_weights)
@@ -84,6 +85,7 @@ def train_dcgan(args, noise_dim=96):
                 continue
 
             # Update D
+            optimizer_Dis.zero_grad()
             real_data = imgs.to(device)          # Move data to device (GPU)
             real_data = (real_data - 0.5) * 2    # make the input between -1 and 1
 
@@ -92,7 +94,6 @@ def train_dcgan(args, noise_dim=96):
             logits_fake = DC_Disc(fake_image)
             logits_real = DC_Disc(real_data)
 
-            optimizer_Dis.zero_grad()
             D_loss = discriminator_loss(logits_real, logits_fake, dtype=dtype, device=device)
             D_loss.backward()
             optimizer_Dis.step()
