@@ -1,3 +1,6 @@
+import math
+import random
+
 import IPython
 import signal
 
@@ -8,14 +11,26 @@ import matplotlib.pyplot as plt
 import itertools
 
 # Load MNIST dataset
+from matplotlib import gridspec
+from torch import nn
+from torch.nn import init
+
 mnist = torchvision.datasets.MNIST(
-	root = 'data/',
-	download = True,
-	train = True,
-	transform = torchvision.transforms.ToTensor() # The data is stored in numpy. Transform it to PyTorch tensors.
+    root='data/',
+    download=True,
+    train=True,
+    transform=torchvision.transforms.ToTensor()  # The data is stored in numpy. Transform it to PyTorch tensors.
 )
 
-mnist_batched = torch.utils.data.DataLoader(mnist, batch_size = 32)
+
+def get_dataset_iterator(batch_size=128):
+    mnist_batched = torch.utils.data.DataLoader(mnist,
+                                                batch_size=batch_size,
+                                                shuffle=True,
+                                                drop_last=True,
+                                                num_workers=2)
+    return iter(mnist_batched)
+
 
 ## Utilities
 
@@ -45,6 +60,7 @@ def interrupted(_interrupted=[False], _default=[None]):
                 _default[0](signal, frame)
             print('Interrupt!')
             _interrupted[0] = True
+
         _default[0] = signal.signal(signal.SIGINT, handle)
     return _interrupted[0]
 
@@ -57,8 +73,49 @@ def enumerate_cycle(g):
         epoch = epoch + 1
 
 
-if __name__ == '__main__':
+def fix_random_seed(seed_no=0):
+    """
+      Fix random seed to get a deterministic output
+      Inputs:
+      - seed_no: seed number to be fixed
+    """
+    torch.manual_seed(seed_no)
+    torch.cuda.manual_seed(seed_no)
+    random.seed(seed_no)
 
+
+def show_images_square(images, cmap='gray'):
+    images = torch.reshape(images, [images.shape[0], -1])  # images reshape to (batch_size, D)
+    sqrtn = int(math.ceil(math.sqrt(images.shape[0])))
+    sqrtimg = int(math.ceil(math.sqrt(images.shape[1])))
+
+    fig = plt.figure(figsize=(sqrtn, sqrtn))
+    gs = gridspec.GridSpec(sqrtn, sqrtn)
+    gs.update(wspace=0.05, hspace=0.05)
+
+    for i, img in enumerate(images):
+        ax = plt.subplot(gs[i])
+        plt.axis('off')
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        ax.set_aspect('equal')
+        plt.imshow(img.reshape([sqrtimg, sqrtimg]), cmap=cmap)
+    plt.show()
+    return
+
+
+def count_params(model):
+    """Count the number of parameters in the model"""
+    param_count = sum([p.numel() for p in model.parameters()])
+    return param_count
+
+
+def initialize_weights(param):
+    if isinstance(param, nn.Linear) or isinstance(param, nn.ConvTranspose2d):
+        init.xavier_uniform_(param.weight.data)
+
+
+if __name__ == '__main__':
     img, lbl = mnist[0]
     # (1 channel * 28 width * 28 height)
     print('Shape of a single mnist image:', img.shape)
@@ -66,7 +123,7 @@ if __name__ == '__main__':
     plt.colorbar()
     plt.show()
 
-    imgs, lbls = next(iter(mnist_batched))
+    imgs, lbls = next(get_dataset_iterator())
     x = torchvision.utils.make_grid(imgs, nrow=3)
     plt.imshow(x.numpy().transpose((1, 2, 0)))
     plt.show()

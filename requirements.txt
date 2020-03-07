@@ -1,0 +1,6 @@
+torch
+matplotlib
+numpy
+docopt
+gitpython
+dpu-utils
