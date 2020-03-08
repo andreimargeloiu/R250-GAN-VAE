@@ -68,7 +68,7 @@ class Encoder(nn.Module):
 
 
 class DC_Generator(nn.Module):
-    def __init__(self, noise_dim):
+    def __init__(self, noise_dim, activation='tanh'):
         super().__init__()
 
         # Linear -> Linear -> ConvTrans2D -> ConvTrans2D
@@ -87,9 +87,11 @@ class DC_Generator(nn.Module):
             nn.BatchNorm2d(64),
 
             nn.ConvTranspose2d(64, 1, kernel_size=(4, 4), stride=2, padding=1),
-
-            nn.Tanh()
         )
+        if activation == 'tanh':
+            self.activation = nn.Tanh()
+        elif activation == 'sigmoid':
+            self.activation = nn.Sigmoid()
 
         self.apply(initialize_weights)
 
@@ -101,7 +103,7 @@ class DC_Generator(nn.Module):
         Output:
         - image: tensor of (None, 1, 28, 28)
         """
-        return self.model(x)
+        return self.activation(self.model(x))
 
 
 class DC_Discriminator(nn.Module):
@@ -221,12 +223,11 @@ class BetaVAE(nn.Module):
         super().__init__()
 
         self.encoder = Encoder(latent_dim, device)
-        self.decoder = DC_Generator(latent_dim)
-        self.sigmoid = nn.Sigmoid()
+        self.decoder = DC_Generator(latent_dim, activation='sigmoid')
 
     def forward(self, x):
         z, mu, log_var = self.encoder(x)
-        output = self.sigmoid(self.decoder(z))
+        output = self.decoder(z)
 
         return output, mu, log_var
 
