@@ -51,7 +51,7 @@ class Encoder(nn.Module):
         shared_encoded = self.model(x)
         mu = self.mu(shared_encoded)
         log_var = self.log_var(shared_encoded)
-        std = torch.exp(self.log_var(shared_encoded) / 2)
+        std = torch.exp(log_var / 2)
 
         return self.sample(mu, std), mu, log_var
 
@@ -147,6 +147,29 @@ class DC_Discriminator(nn.Module):
         return part_2, l_layer
 
 
+class BetaVAE(nn.Module):
+    def __init__(self, latent_dim, device):
+        super().__init__()
+
+        self.encoder = Encoder(latent_dim, device)
+        self.decoder = DC_Generator(latent_dim)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        z, mu, log_var = self.encoder(x)
+        output = self.sigmoid(self.decoder(z))
+
+        return output, mu, log_var
+
+    @staticmethod
+    def loss_function(x_input, x_recons, mu, logvar, beta=1):
+        BCE = F.binary_cross_entropy(x_recons, x_input, reduction='sum')
+
+        KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+
+        return BCE + beta * KLD
+
+
 def sample_noise(batch_size, dim, dtype, device):
     """
     Generate a PyTorch tensor of uniform random noise.
@@ -173,7 +196,7 @@ def discriminator_loss(logits_real, logits_fake, dtype, device):
     """
 
     loss = bce_loss(logits_real, torch.ones(logits_real.size(), dtype=dtype, device=device)) \
-         + bce_loss(logits_fake, torch.zeros(logits_real.size(), dtype=dtype, device=device))
+           + bce_loss(logits_fake, torch.zeros(logits_real.size(), dtype=dtype, device=device))
 
     return loss
 

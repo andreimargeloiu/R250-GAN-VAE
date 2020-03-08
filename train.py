@@ -22,7 +22,8 @@ from torch import nn
 from torch.autograd import Variable
 from torch.nn.functional import binary_cross_entropy_with_logits as bce_loss
 
-from models import DC_Generator, DC_Discriminator, discriminator_loss, generator_loss, sample_noise, Encoder, Flatten
+from models import DC_Generator, DC_Discriminator, discriminator_loss, generator_loss, sample_noise, Encoder, Flatten, \
+    BetaVAE
 from utils import fix_random_seed, get_dataset_iterator, initialize_weights, show_images_square
 
 """
@@ -215,6 +216,38 @@ def train_vaegan(args, latent_dimension=128):
                 print('Iter: {}, Enc: {:.4}, Dec:{:.4}, Dis:{:.4}'.format(iter_count, enc_losses[-1], dec_losses[-1],
                                                                           dis_losses[-1]))
                 imgs_output = decoder(noise_for_images_to_show).data.cpu()
+                show_images_square(imgs_output)
+                plt.show()
+            iter_count += 1
+
+
+def train_betavae(args, latent_dimension=128):
+    betaVAE = BetaVAE(latent_dimension, device)
+    optimizer_betaVAE = torch.optim.Adadelta(betaVAE.parameters(), lr=0.02)
+
+    iter_count = 0
+    show_every = 5
+    batch_size = 128
+    noise_for_images_to_show = sample_noise(16, latent_dimension, dtype=dtype, device=device)
+    gamma = 1
+
+    # prev_time = time.now()
+    for epoch in range(int(args['--epochs'])):
+        batch_iter = get_dataset_iterator(batch_size=batch_size)
+        for imgs, _ in batch_iter:
+            # Forward pass
+            x_real = imgs.to(device)
+            x_recon, mu, log_var = betaVAE.forward(x_real)
+
+            loss = BetaVAE.loss_function(x_real, x_recon, mu, log_var, beta=1)
+            optimizer_betaVAE.zero_grad()
+            loss.backward()
+            optimizer_betaVAE.step()
+
+
+            if iter_count % show_every == 0:
+                print('Iter: {}, Loss: {:.4}'.format(iter_count, loss.item()))
+                imgs_output = betaVAE.decoder(noise_for_images_to_show).data.cpu()
                 show_images_square(imgs_output)
                 plt.show()
             iter_count += 1
