@@ -149,15 +149,6 @@ class DC_Discriminator(nn.Module):
         return part_2, l_layer
 
 
-class Reshaper(nn.Module):
-    def __init__(self, dim):
-        super().__init__()
-        self.dim = dim
-
-    def forward(self, x):
-        return torch.reshape(x, self.dim)
-
-
 class BetaVAE(nn.Module):
     def __init__(self, latent_dim, device):
         super().__init__()

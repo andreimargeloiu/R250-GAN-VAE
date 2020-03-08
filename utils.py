@@ -116,7 +116,9 @@ def count_params(model):
 
 
 def initialize_weights(param):
-    if isinstance(param, nn.Linear) or isinstance(param, nn.ConvTranspose2d):
+    if isinstance(param, nn.Linear) \
+            or isinstance(param, nn.ConvTranspose2d) \
+            or isinstance(param, nn.Conv2d):
         init.xavier_uniform_(param.weight.data)
 
 
