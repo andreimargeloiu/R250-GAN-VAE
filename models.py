@@ -1,12 +1,70 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.nn.functional import binary_cross_entropy_with_logits as bce_loss
+
 from torch.nn import functional as F
 
 import IPython
+from torch.nn.functional import binary_cross_entropy_with_logits as bce_loss
 from utils import mnist, initialize_weights, show_images_square
 from utils import interrupted, enumerate_cycle
+
+
+class Encoder(nn.Module):
+    def __init__(self, latent_dim, device):
+        """
+        The input is (None, 1, 28, 28),
+        """
+        super().__init__()
+        self.device = device
+
+        self.model = nn.Sequential(
+            nn.Conv2d(1, 16, kernel_size=3, stride=2, padding=(1, 1)),  # (16, 14, 14)
+            nn.LeakyReLU(inplace=True),
+            nn.BatchNorm2d(16),
+
+            nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=(1, 1)),  # (32, 7, 7)
+            nn.LeakyReLU(inplace=True),
+            nn.BatchNorm2d(32),
+
+            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=(1, 1)),  # (64, 4, 4)
+            nn.LeakyReLU(inplace=True),
+            nn.BatchNorm2d(64),
+
+            Flatten()
+        )
+        self.mu = nn.Linear(1024, latent_dim)
+        self.log_var = nn.Linear(1024, latent_dim)
+
+        self.apply(initialize_weights)
+
+    def forward(self, x):
+        """
+        Input
+        - x: Tensor of (Batch, 1, 28, 28)
+
+        Output:
+        - z: sample from the latent variable
+        - mu
+        - std
+        """
+        shared_encoded = self.model(x)
+        mu = self.mu(shared_encoded)
+        log_var = self.log_var(shared_encoded)
+        std = torch.exp(self.log_var(shared_encoded) / 2)
+
+        return self.sample(mu, std), mu, log_var
+
+    def sample(self, mu, std):
+        """
+        The reparametrization trick
+
+        Output:
+        - x - tensor of (None, latent_dim), sampled from the encoding
+        """
+        epsilon = torch.randn(mu.size()).to(self.device)
+
+        return mu + epsilon * std
 
 
 class DC_Generator(nn.Module):
@@ -33,6 +91,8 @@ class DC_Generator(nn.Module):
             nn.Tanh()
         )
 
+        self.apply(initialize_weights)
+
     def forward(self, x):
         """
         Input:
@@ -49,7 +109,7 @@ class DC_Discriminator(nn.Module):
         super().__init__()
 
         # Conv2D -> Conv2D -> Flatten -> Fully connected -> Fully connected
-        self.model = nn.Sequential(
+        self.part_1 = nn.Sequential(
             Unflatten(-1, 1, 28, 28),
             nn.Conv2d(1, 32, kernel_size=(5, 5), stride=1),
             nn.LeakyReLU(inplace=True),
@@ -59,11 +119,17 @@ class DC_Discriminator(nn.Module):
             nn.LeakyReLU(inplace=True),
             nn.MaxPool2d(kernel_size=(2, 2), stride=2),
             Flatten(),
+        )
 
+        self.flatten = Flatten()
+
+        self.part_2 = nn.Sequential(
             nn.Linear(1024, 1024),
             nn.LeakyReLU(inplace=True),
             nn.Linear(1024, 1)
         )
+
+        self.apply(initialize_weights)
 
     def forward(self, x):
         """
@@ -71,9 +137,14 @@ class DC_Discriminator(nn.Module):
         - x: tensor of (None, 1, 28, 28)
 
         Output:
-        - predictions: tensor of (None, 1)
+        - prediction_logits: tensor of (None, 1) (no sigmoid!!!)
+        - l_layer (None, -1) - values flattened for th el-th layer (used to compute the loss)
         """
-        return self.model(x)
+        part_1 = self.part_1(x)
+        l_layer = self.flatten(part_1)
+        part_2 = self.part_2(part_1)
+
+        return part_2, l_layer
 
 
 def sample_noise(batch_size, dim, dtype, device):
@@ -129,7 +200,7 @@ class Flatten(nn.Module):
     """
 
     def forward(self, x):
-        N, C, H, W = x.size()
+        N = x.size()[0]
         return x.view(N, -1)
 
 

@@ -87,6 +87,10 @@ def fix_random_seed(seed_no=0):
 
 
 def show_images_square(images, cmap='gray'):
+    """
+    Input:
+    - images: Tensor of images (batch_size, C, H, W)
+    """
     images = torch.reshape(images, [images.shape[0], -1])  # images reshape to (batch_size, D)
     sqrtn = int(math.ceil(math.sqrt(images.shape[0])))
     sqrtimg = int(math.ceil(math.sqrt(images.shape[1])))
