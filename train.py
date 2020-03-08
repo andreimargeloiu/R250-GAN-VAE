@@ -226,7 +226,7 @@ def train_betavae(args, latent_dimension=64):
 
     # betaVAE = BetaVAE(latent_dimension, device).to(device)
     betaVAE = BetaVAE_course(latent_dimension).to(device)
-    optimizer_betaVAE = torch.optim.Adadelta(betaVAE.parameters(), lr=0.05)
+    optimizer_betaVAE = torch.optim.Adam(betaVAE.parameters(), lr=0.02)
 
     iter_count = 0
     show_every = 5
@@ -256,7 +256,7 @@ def train_betavae(args, latent_dimension=64):
                 print('Iter: {}, Loss: {:.4}'.format(iter_count, loss.item()))
                 # imgs_output = betaVAE.decoder(noise_for_images_to_show).data.cpu()
 
-                show_images_square(rx.detach())
+                show_images_square(rx.data.cpu())
                 plt.show()
             iter_count += 1
 
