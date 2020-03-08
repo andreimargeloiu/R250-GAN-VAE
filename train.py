@@ -130,7 +130,7 @@ def train_vaegan(args, latent_dimension=128):
     # input = sample_noise(batch_size, latent_dimension, dtype=dtype, device=device)
     imgs, _ = next(get_dataset_iterator(batch_size=16))  # (batch_size, 1, 28, 28)
 
-    imgs_enc, _, _ = encoder.forward(imgs)
+    imgs_enc, _, _ = encoder.forward(imgs.to(device))
     print("Latent variables has dimension: {imgs_enc.size()}")
 
     imgs_dec = decoder.forward(imgs_enc)
