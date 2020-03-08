@@ -158,66 +158,6 @@ class Reshaper(nn.Module):
         return torch.reshape(x, self.dim)
 
 
-class BetaVAE_course(nn.Module):
-    def __init__(self, latent_dim=4):
-        super().__init__()
-        self.shared_encoder = nn.Sequential(
-            nn.Conv2d(1, 32, 3, 1),
-            nn.LeakyReLU(),
-            nn.Conv2d(32, 64, 3, 1),
-            nn.MaxPool2d(2),
-            nn.Flatten(1),
-            nn.Linear(9216, 128),
-            nn.LeakyReLU()
-        )
-
-        self.fc_mu = nn.Linear(128, latent_dim)
-        # variance is always positive, thus this layer encodes log(variance).
-        # we compute the std in reparameterize()
-        self.fc_logvar = nn.Linear(128, latent_dim)
-
-        self.decoder = nn.Sequential(
-            nn.Linear(latent_dim, 128),
-            nn.LeakyReLU(),
-            nn.Linear(128, 1728),
-            nn.LeakyReLU(),
-            Reshaper((-1, 12, 12, 12)),
-            nn.Conv2d(12, 36, 3, 1),
-            nn.LeakyReLU(),
-            Reshaper((-1, 4, 30, 30)),
-            nn.Conv2d(4, 4, 3, 1),
-            nn.LeakyReLU(),
-            nn.Conv2d(4, 1, 1, 1),
-            nn.Sigmoid()
-        )
-
-    def encode(self, x):
-        shared_latent = F.relu(self.shared_encoder(x))
-        mu = self.fc_mu(shared_latent)
-        logvar = self.fc_logvar(shared_latent)
-
-        return mu, logvar
-
-    def reparameterize(self, mu, logvar):
-        std = torch.exp(0.5 * logvar)
-        eps = torch.randn_like(std)
-        return mu + eps * std
-
-    def forward(self, x):
-        mu, logvar = self.encode(x)
-        z = self.reparameterize(mu, logvar)
-
-        return self.decoder(z), mu, logvar, z
-
-    @staticmethod
-    def loss_function(reconstructed_x, x, mu, logvar, beta=1):
-        BCE = F.binary_cross_entropy(reconstructed_x, x, reduction='sum')
-
-        KLD = beta * -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-
-        return BCE + KLD
-
-
 class BetaVAE(nn.Module):
     def __init__(self, latent_dim, device):
         super().__init__()
@@ -232,12 +172,12 @@ class BetaVAE(nn.Module):
         return output, mu, log_var
 
     @staticmethod
-    def loss_function(x_input, x_recons, mu, logvar, beta=1):
-        BCE = F.binary_cross_entropy(x_recons, x_input, reduction='sum')
+    def loss_function(reconstructed_x, x, mu, logvar, beta=1):
+        BCE = F.binary_cross_entropy(reconstructed_x, x, reduction='sum')
 
-        KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+        KLD = beta * -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
 
-        return BCE + beta * KLD
+        return BCE + KLD
 
 
 def sample_noise(batch_size, dim, dtype, device):

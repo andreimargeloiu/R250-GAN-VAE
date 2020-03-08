@@ -23,7 +23,7 @@ from torch.autograd import Variable
 from torch.nn.functional import binary_cross_entropy_with_logits as bce_loss
 
 from models import DC_Generator, DC_Discriminator, discriminator_loss, generator_loss, sample_noise, Encoder, Flatten, \
-    BetaVAE, BetaVAE_course
+    BetaVAE
 from utils import fix_random_seed, get_dataset_iterator, initialize_weights, show_images_square
 
 """
@@ -224,8 +224,7 @@ def train_vaegan(args, latent_dimension=128):
 def train_betavae(args, latent_dimension=64):
     fix_random_seed(0)
 
-    # betaVAE = BetaVAE(latent_dimension, device).to(device)
-    betaVAE = BetaVAE_course(latent_dimension).to(device)
+    betaVAE = BetaVAE(latent_dimension, device).to(device)
     optimizer_betaVAE = torch.optim.Adam(betaVAE.parameters(), lr=1e-3)
 
     iter_count = 0
@@ -233,28 +232,22 @@ def train_betavae(args, latent_dimension=64):
     batch_size = 128
     noise_for_images_to_show = sample_noise(16, latent_dimension, dtype=dtype, device=device)
 
-    # prev_time = time.now()
     for epoch in range(int(args['--epochs'])):
         batch_iter = get_dataset_iterator(batch_size=batch_size)
         for imgs, _ in batch_iter:
             # Forward pass
             x_real = imgs.to(device)
             optimizer_betaVAE.zero_grad()
-            rx, mu, logvar, z = betaVAE(x_real)
-            loss = BetaVAE_course.loss_function(rx, x_real, mu, logvar, beta=3)
+            rx, mu, logvar = betaVAE(x_real)
+            loss = BetaVAE.loss_function(rx, x_real, mu, logvar, beta=3)
             loss.backward()
             optimizer_betaVAE.step()
 
-            # x_recon, mu, log_var = betaVAE.forward(x_real)
-            #
-            # loss = BetaVAE.loss_function(x_real, x_recon, mu, log_var, beta=1)
-            # optimizer_betaVAE.zero_grad()
-            # loss.backward()
-            # optimizer_betaVAE.step()
-
             if iter_count % show_every == 0:
                 print('Iter: {}, Loss: {:.4}'.format(iter_count, loss.item()))
-                # imgs_output = betaVAE.decoder(noise_for_images_to_show).data.cpu()
+                imgs_output = betaVAE.decoder(noise_for_images_to_show)
+                show_images_square(imgs_output.data.cpu())
+                plt.show()
 
                 show_images_square(rx.data.cpu())
                 plt.show()
