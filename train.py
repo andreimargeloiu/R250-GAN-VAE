@@ -226,11 +226,11 @@ def train_betavae(args, latent_dimension=64):
 
     # betaVAE = BetaVAE(latent_dimension, device).to(device)
     betaVAE = BetaVAE_course(latent_dimension).to(device)
-    optimizer_betaVAE = torch.optim.Adam(betaVAE.parameters(), lr=0.02)
+    optimizer_betaVAE = torch.optim.Adam(betaVAE.parameters(), lr=1e-3)
 
     iter_count = 0
     show_every = 250
-    batch_size = 32
+    batch_size = 128
     noise_for_images_to_show = sample_noise(16, latent_dimension, dtype=dtype, device=device)
 
     # prev_time = time.now()
