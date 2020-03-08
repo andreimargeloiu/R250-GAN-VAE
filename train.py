@@ -73,9 +73,9 @@ def train_dcgan(args, noise_dim=96):
     optimizer_Dis = create_optimizer(DC_Disc)
 
     iter_count = 0
-    show_every = 50
+    show_every = 250
     batch_size = 128
-    noise_for_images_to_show = sample_noise(16, noise_dim, dtype=dtype, device=device)
+    noise_for_images_to_show = sample_noise(36, noise_dim, dtype=dtype, device=device)
 
     for epoch in range(int(args['--epochs'])):
         batch_iter = get_dataset_iterator(batch_size=batch_size)
