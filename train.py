@@ -229,7 +229,7 @@ def train_betavae(args, latent_dimension=64):
     optimizer_betaVAE = torch.optim.Adam(betaVAE.parameters(), lr=0.02)
 
     iter_count = 0
-    show_every = 5
+    show_every = 250
     batch_size = 32
     noise_for_images_to_show = sample_noise(16, latent_dimension, dtype=dtype, device=device)
 
