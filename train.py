@@ -222,7 +222,7 @@ def train_vaegan(args, latent_dimension=128):
 
 
 def train_betavae(args, latent_dimension=128):
-    betaVAE = BetaVAE(latent_dimension, device)
+    betaVAE = BetaVAE(latent_dimension, device).to(device)
     optimizer_betaVAE = torch.optim.Adadelta(betaVAE.parameters(), lr=0.02)
 
     iter_count = 0
