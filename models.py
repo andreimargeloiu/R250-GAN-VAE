@@ -16,16 +16,16 @@ class DC_Generator(nn.Module):
         # Linear -> Linear -> ConvTrans2D -> ConvTrans2D
         self.model = nn.Sequential(
             nn.Linear(noise_dim, 1024),
-            nn.ReLU(True),
+            nn.LeakyReLU(True),
             nn.BatchNorm1d(1024),
 
             nn.Linear(1024, 7 * 7 * 128),
-            nn.ReLU(True),
+            nn.LeakyReLU(True),
             nn.BatchNorm1d(7 * 7 * 128),
             Unflatten(-1, 128, 7, 7),
 
             nn.ConvTranspose2d(128, 64, kernel_size=(4, 4), stride=2, padding=1),
-            nn.ReLU(True),
+            nn.LeakyReLU(True),
             nn.BatchNorm2d(64),
 
             nn.ConvTranspose2d(64, 1, kernel_size=(4, 4), stride=2, padding=1),
