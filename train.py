@@ -111,7 +111,7 @@ def train_dcgan(args, noise_dim=96):
             if iter_count % show_every == 0:
                 print('Iter: {}, D: {:.4}, G:{:.4}'.format(iter_count, D_loss.item(), G_loss.item()))
                 imgs_output = DC_Gen(noise_for_images_to_show).data.cpu()
-                show_images_square(imgs_output[0:16])
+                show_images_square(imgs_output)
                 plt.show()
                 print()
             iter_count += 1
