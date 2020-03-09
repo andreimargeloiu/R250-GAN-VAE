@@ -5,8 +5,8 @@ Usage:
 Options:
     -h
     --debug                         Enable debug routines. [default: False]
-    --epochs=INT                    Number of epochs to run [default: 5]
-    --show-every=INT                Print statistics every X epochs [default:1]
+    --epochs=INT                    Number of epochs to run [default: 15]
+    --show-every=INT                Print statistics every X epochs [default: 250]
     --base-path=NAME                Path to the log file [default: .]
 """
 import json
@@ -125,7 +125,7 @@ def train_vaegan(args, latent_dimension=128):
 
     #### Hyperparameters
     iter_count = 0
-    show_every = args['--show-every']
+    show_every = int(args['--show-every'])
     batch_size = 128
     noise_for_images_to_show = sample_noise(16, latent_dimension, dtype=dtype, device=device)
     gamma = 1
