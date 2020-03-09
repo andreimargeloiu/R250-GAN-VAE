@@ -106,7 +106,7 @@ def show_images_square(images, cmap='gray'):
         ax.set_yticklabels([])
         ax.set_aspect('equal')
         plt.imshow(img.reshape([sqrtimg, sqrtimg]), cmap=cmap)
-    return
+    return fig
 
 
 def count_params(model):

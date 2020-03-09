@@ -7,24 +7,26 @@ Options:
     --debug                         Enable debug routines. [default: False]
     --epochs=INT                    Number of epochs to run [default: 5]
 
-    --log-file=NAME                 Path to the log file [default: ./logs/training.log]
+    --base-path=NAME              Path to the log file [default: .]
 """
 import json
-import logging
-from datetime import time
+from datetime import datetime
+from os import path
 
 import git
+import logging
+import matplotlib.pyplot as plt
 import torch
 from docopt import docopt
 from dpu_utils.utils import run_and_debug
-import matplotlib.pyplot as plt
 from torch import nn
 from torch.autograd import Variable
 from torch.nn.functional import binary_cross_entropy_with_logits as bce_loss
 
-from models import DC_Generator, DC_Discriminator, discriminator_loss, generator_loss, sample_noise, Encoder, Flatten, \
-    BetaVAE
-from utils import fix_random_seed, get_dataset_iterator, initialize_weights, show_images_square
+from models import DC_Generator, DC_Discriminator, discriminator_loss, generator_loss, sample_noise, Encoder, BetaVAE
+from utils import fix_random_seed, get_dataset_iterator, show_images_square
+
+from torch.utils.tensorboard import SummaryWriter
 
 """
     Global variables
@@ -42,7 +44,7 @@ def initialize_logger(args):
     logging.basicConfig(format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
                         level=logging.DEBUG,
                         datefmt='%m-%d %H:%M:%S',
-                        filename=args['--log-file'],
+                        filename=path.join(args['--base-path'], 'logs/training.log'),
                         filemode='a')
 
     console = logging.StreamHandler()
@@ -92,8 +94,8 @@ def train_dcgan(args, noise_dim=96):
 
             noise_input = sample_noise(batch_size, noise_dim, dtype=real_data.dtype, device=real_data.device)
             fake_image = DC_Gen(noise_input)
-            logits_fake = DC_Disc(fake_image)
-            logits_real = DC_Disc(real_data)
+            logits_fake, _ = DC_Disc(fake_image)
+            logits_real, _ = DC_Disc(real_data)
 
             D_loss = discriminator_loss(logits_real, logits_fake, dtype=dtype, device=device)
             D_loss.backward()
@@ -102,7 +104,7 @@ def train_dcgan(args, noise_dim=96):
             # Update G parameters
             noise_input = sample_noise(batch_size, noise_dim, dtype=real_data.dtype, device=real_data.device)
             fake_image = DC_Gen(noise_input)
-            logits_fake = DC_Disc(fake_image)
+            logits_fake, _ = DC_Disc(fake_image)
 
             optimizer_Gen.zero_grad()
             G_loss = generator_loss(logits_fake, dtype=dtype, device=device)
@@ -121,10 +123,25 @@ def train_dcgan(args, noise_dim=96):
 def train_vaegan(args, latent_dimension=128):
     fix_random_seed(0)
 
+    #### Hyperparameters
+    iter_count = 0
+    show_every = 1
+    batch_size = 128
+    noise_for_images_to_show = sample_noise(16, latent_dimension, dtype=dtype, device=device)
+    gamma = 1
+    lr = 1e-3
+    beta = 1
+    negative_slope = 0.01
+
+    tb_logdir = path.join(args['--base-path'],
+                          f"tensorboard/scalars/{datetime.now().strftime('%Y%m%d-%H%M%S')}_lr={lr}_gamma={gamma}_beta={beta}_neg_slope={negative_slope}_batch={batch_size}")
+    write = SummaryWriter(log_dir=tb_logdir)
+
+
     # Create models and initialize weights
-    encoder = Encoder(latent_dimension, device).to(device)
-    decoder = DC_Generator(latent_dimension).to(device)
-    discriminator = DC_Discriminator().to(device)
+    encoder = Encoder(latent_dimension, device, negative_slope).to(device)
+    decoder = DC_Generator(latent_dimension, activation='sigmoid', negative_slope=negative_slope).to(device)
+    discriminator = DC_Discriminator(negative_slope).to(device)
 
     ########## Testing Forward Pass #############
     # Test encode - decode
@@ -144,10 +161,11 @@ def train_vaegan(args, latent_dimension=128):
     print(f"Discriminator output shape: {decision.size()}")
     ########## End test Forward Pass #############
 
+
     # Optimizer
-    optimizer_encoder = torch.optim.Adam(encoder.parameters(), lr=1e-3, betas=(0.5, 0.999))
-    optimizer_decoder = torch.optim.Adam(decoder.parameters(), lr=1e-3, betas=(0.5, 0.999))
-    optimizer_discriminator = torch.optim.Adam(discriminator.parameters(), lr=1e-3, betas=(0.5, 0.999))
+    optimizer_encoder = torch.optim.Adam(encoder.parameters(), lr=lr, betas=(0.5, 0.999))
+    optimizer_decoder = torch.optim.Adam(decoder.parameters(), lr=lr, betas=(0.5, 0.999))
+    optimizer_discriminator = torch.optim.Adam(discriminator.parameters(), lr=lr, betas=(0.5, 0.999))
 
     # Loss
     criterion = nn.BCELoss()  # Binary cross entropy
@@ -155,17 +173,7 @@ def train_vaegan(args, latent_dimension=128):
     criterion_rec = nn.MSELoss(reduction='sum')  # MSE loss
     criterion_kl = nn.KLDivLoss(reduction='sum')  # KL divergence
 
-    iter_count = 0
-    show_every = 1
-    batch_size = 128
-    noise_for_images_to_show = sample_noise(16, latent_dimension, dtype=dtype, device=device)
-    gamma = 1
 
-    enc_losses = []
-    dec_losses = []
-    dis_losses = []
-
-    # prev_time = time.now()
     for epoch in range(int(args['--epochs'])):
         batch_iter = get_dataset_iterator(batch_size=batch_size)
         for imgs, _ in batch_iter:
@@ -176,7 +184,8 @@ def train_vaegan(args, latent_dimension=128):
 
             logits_real, l_layer_real = discriminator.forward(x_real)
             logits_fake, l_layer_fake = discriminator.forward(x_decoded)
-
+            acc_real = (logits_real >= 0).sum() / batch_size
+            acc_fake = (logits_fake < 0).sum() / batch_size
 
             ###### Compute losses ######
             L_prior = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
@@ -193,31 +202,41 @@ def train_vaegan(args, latent_dimension=128):
                     + L_discriminator_prior
 
             ###### Backprop ######
-            L_enc = L_prior + L_llik_l
+            L_enc = beta * L_prior + L_llik_l
             L_dec = gamma * L_llik_l - L_GAN
             L_dis = L_GAN
 
             optimizer_encoder.zero_grad()
-            enc_losses.append(L_enc.item())
             L_enc.backward(retain_graph=True)
             optimizer_encoder.step()
 
             optimizer_decoder.zero_grad()
-            dec_losses.append(L_dec.item())
             L_dec.backward(retain_graph=True)
             optimizer_decoder.step()
 
             optimizer_discriminator.zero_grad()
-            dis_losses.append(L_dis.item())
             L_dis.backward(retain_graph=True)
             optimizer_discriminator.step()
 
+
+            #### Tensorboard
+            write.add_scalar("Loss/Encoder", L_enc.item(), iter_count)
+            write.add_scalar("Loss/Decoder", L_dec.item(), iter_count)
+            write.add_scalar("Loss/Discriminator", L_dis.item(), iter_count)
+            write.add_scalar("Accuracy/Acc-Real", acc_real, iter_count)
+            write.add_scalar("Accuracy/Acc-Fake", acc_fake, iter_count)
+
             if iter_count % show_every == 0:
-                print('Iter: {}, Enc: {:.4}, Dec:{:.4}, Dis:{:.4}'.format(iter_count, enc_losses[-1], dec_losses[-1],
-                                                                          dis_losses[-1]))
-                imgs_output = decoder(noise_for_images_to_show).data.cpu()
-                show_images_square(imgs_output)
+                print('Iter: {}, Enc: {:.4}, Dec:{:.4}, Dis:{:.4}'.format(iter_count, L_enc.item(), L_dec.item(),
+                                                                          L_dis.item()))
+                imgs_output = decoder(noise_for_images_to_show[:16]).data.cpu()
+                fig = show_images_square(imgs_output)
+                write.add_figure(tag="Figure/Initial_noise", figure=fig, global_step=iter_count)
                 plt.show()
+
+                write.add_figure(tag="Figure/Reconstructed", figure=show_images_square(x_decoded.data.cpu()[:16]), global_step=iter_count)
+                plt.show()
+
             iter_count += 1
 
 

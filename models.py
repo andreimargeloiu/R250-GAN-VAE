@@ -11,7 +11,7 @@ from utils import interrupted, enumerate_cycle
 
 
 class Encoder(nn.Module):
-    def __init__(self, latent_dim, device):
+    def __init__(self, latent_dim, device, negative_slope=0.01):
         """
         The input is (None, 1, 28, 28),
         """
@@ -20,15 +20,15 @@ class Encoder(nn.Module):
 
         self.model = nn.Sequential(
             nn.Conv2d(1, 16, kernel_size=3, stride=2, padding=(1, 1)),  # (16, 14, 14)
-            nn.LeakyReLU(inplace=True),
+            nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
             nn.BatchNorm2d(16),
 
             nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=(1, 1)),  # (32, 7, 7)
-            nn.LeakyReLU(inplace=True),
+            nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
             nn.BatchNorm2d(32),
 
             nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=(1, 1)),  # (64, 4, 4)
-            nn.LeakyReLU(inplace=True),
+            nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
             nn.BatchNorm2d(64),
 
             Flatten()
@@ -68,22 +68,22 @@ class Encoder(nn.Module):
 
 
 class DC_Generator(nn.Module):
-    def __init__(self, noise_dim, activation='tanh'):
+    def __init__(self, noise_dim, activation='tanh', negative_slope=0.01):
         super().__init__()
 
         # Linear -> Linear -> ConvTrans2D -> ConvTrans2D
         self.model = nn.Sequential(
             nn.Linear(noise_dim, 1024),
-            nn.LeakyReLU(inplace=True),
+            nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
             nn.BatchNorm1d(1024),
 
             nn.Linear(1024, 7 * 7 * 128),
-            nn.LeakyReLU(inplace=True),
+            nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
             nn.BatchNorm1d(7 * 7 * 128),
             Unflatten(-1, 128, 7, 7),
 
             nn.ConvTranspose2d(128, 64, kernel_size=(4, 4), stride=2, padding=1),
-            nn.LeakyReLU(inplace=True),
+            nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
             nn.BatchNorm2d(64),
 
             nn.ConvTranspose2d(64, 1, kernel_size=(4, 4), stride=2, padding=1),
@@ -107,18 +107,18 @@ class DC_Generator(nn.Module):
 
 
 class DC_Discriminator(nn.Module):
-    def __init__(self):
+    def __init__(self, negative_slope=0.01):
         super().__init__()
 
         # Conv2D -> Conv2D -> Flatten -> Fully connected -> Fully connected
         self.part_1 = nn.Sequential(
             Unflatten(-1, 1, 28, 28),
             nn.Conv2d(1, 32, kernel_size=(5, 5), stride=1),
-            nn.LeakyReLU(inplace=True),
+            nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
             nn.MaxPool2d(kernel_size=(2, 2), stride=2),
 
             nn.Conv2d(32, 64, kernel_size=(5, 5), stride=1),
-            nn.LeakyReLU(inplace=True),
+            nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
             nn.MaxPool2d(kernel_size=(2, 2), stride=2),
             Flatten(),
         )
@@ -127,7 +127,7 @@ class DC_Discriminator(nn.Module):
 
         self.part_2 = nn.Sequential(
             nn.Linear(1024, 1024),
-            nn.LeakyReLU(inplace=True),
+            nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
             nn.Linear(1024, 1)
         )
 
