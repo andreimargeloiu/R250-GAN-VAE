@@ -6,8 +6,8 @@ Options:
     -h
     --debug                         Enable debug routines. [default: False]
     --epochs=INT                    Number of epochs to run [default: 5]
-
-    --base-path=NAME              Path to the log file [default: .]
+    --show-every=INT                Print statistics every X epochs [default:1]
+    --base-path=NAME                Path to the log file [default: .]
 """
 import json
 from datetime import datetime
@@ -125,7 +125,7 @@ def train_vaegan(args, latent_dimension=128):
 
     #### Hyperparameters
     iter_count = 0
-    show_every = 1
+    show_every = args['--show-every']
     batch_size = 128
     noise_for_images_to_show = sample_noise(16, latent_dimension, dtype=dtype, device=device)
     gamma = 1
@@ -135,7 +135,7 @@ def train_vaegan(args, latent_dimension=128):
 
     tb_logdir = path.join(args['--base-path'],
                           f"tensorboard/scalars/{datetime.now().strftime('%Y%m%d-%H%M%S')}_lr={lr}_gamma={gamma}_beta={beta}_neg_slope={negative_slope}_batch={batch_size}")
-    write = SummaryWriter(log_dir=tb_logdir)
+    write = SummaryWriter(log_dir=tb_logdir, flush_secs=20)
 
 
     # Create models and initialize weights
