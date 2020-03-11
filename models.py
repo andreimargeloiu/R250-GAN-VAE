@@ -1,3 +1,6 @@
+import gzip
+import os
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -10,12 +13,37 @@ from utils import mnist, initialize_weights, show_images_square
 from utils import interrupted, enumerate_cycle
 
 
-class Encoder(nn.Module):
+class BaseModel(nn.Module):
+    def __init__(self, model_name):
+        super().__init__()
+        self.model_name = model_name
+
+    def save(self, save_dir_path: str) -> None:
+        """
+        Save the model's weights to be later restored
+        """
+        with gzip.open(os.path.join(save_dir_path, self.model_name), "wb") as out_file:
+            torch.save(self, out_file)
+
+    @classmethod
+    def restore(cls, model_dir_path: str, model_name):
+        """
+        Restore a model.
+        Input()
+
+        Output:
+        - Instance of restored model.
+        """
+        with gzip.open(os.path.join(model_dir_path, model_name), "rb") as fh:
+            return torch.load(fh)
+
+
+class Encoder(BaseModel):
     def __init__(self, latent_dim, device, negative_slope=0.01):
         """
         The input is (None, 1, 28, 28),
         """
-        super().__init__()
+        super().__init__(model_name="encoder")
         self.device = device
 
         self.model = nn.Sequential(
@@ -67,9 +95,9 @@ class Encoder(nn.Module):
         return mu + epsilon * std
 
 
-class DC_Generator(nn.Module):
+class Decoder(BaseModel):
     def __init__(self, noise_dim, activation='tanh', negative_slope=0.01):
-        super().__init__()
+        super().__init__(model_name="decoder")
 
         # Linear -> Linear -> ConvTrans2D -> ConvTrans2D
         self.model = nn.Sequential(
@@ -106,9 +134,9 @@ class DC_Generator(nn.Module):
         return self.activation(self.model(x))
 
 
-class DC_Discriminator(nn.Module):
+class Discriminator(BaseModel):
     def __init__(self, negative_slope=0.01):
-        super().__init__()
+        super().__init__(model_name="discriminator")
 
         # Conv2D -> Conv2D -> Flatten -> Fully connected -> Fully connected
         self.part_1 = nn.Sequential(
@@ -149,12 +177,12 @@ class DC_Discriminator(nn.Module):
         return part_2, l_layer
 
 
-class BetaVAE(nn.Module):
+class BetaVAE(BaseModel):
     def __init__(self, latent_dim, device):
         super().__init__()
 
         self.encoder = Encoder(latent_dim, device)
-        self.decoder = DC_Generator(latent_dim, activation='sigmoid')
+        self.decoder = Decoder(latent_dim, activation='sigmoid')
 
     def forward(self, x):
         z, mu, log_var = self.encoder(x)
@@ -247,10 +275,10 @@ class Unflatten(nn.Module):
 if __name__ == "__main__":
     noise_dim = 10
 
-    generator = DC_Generator(noise_dim)
+    generator = Decoder(noise_dim)
     generator.apply(initialize_weights)
 
-    discriminator = DC_Discriminator()
+    discriminator = Discriminator()
     discriminator.apply(initialize_weights)
 
     generator_output = generator(sample_noise(4, noise_dim))
