@@ -78,7 +78,7 @@ def run(args):
     if args['--model'] == 'betavae':
         train_betavae(args)
     elif args['--model'] == 'vaegan':
-        train_vaegan(args)
+        return train_vaegan(args)
 
 
 def train_dcgan(args, noise_dim=96):
