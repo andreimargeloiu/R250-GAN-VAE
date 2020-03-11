@@ -14,6 +14,7 @@ import os
 import pickle
 from os import path
 import matplotlib.pyplot as plt
+import numpy as np
 
 import torch
 import torchvision
@@ -21,8 +22,8 @@ from docopt import docopt
 from dpu_utils.utils import run_and_debug
 from sys import exit
 
-from models import Encoder, Decoder, Discriminator
-from utils import fix_random_seed, get_dataset_iterator
+from models import Encoder, Decoder, Discriminator, sample_noise
+from utils import fix_random_seed, get_dataset_iterator, show_images_square
 
 
 def run(args):
@@ -56,16 +57,63 @@ def run(args):
     imgs, _ = next(batch_iter)
 
     encoder.eval()
-    _, mu, _ = encoder(imgs)
     decoder.eval()
-    imgs_recon = decoder(mu).detach()
 
-    x = torchvision.utils.make_grid(torch.cat([imgs, imgs_recon], dim=0), nrow=5, pad_value=0.5)
+    sample, mu, logvar = encoder(imgs)
+    # print(mu)
+    # print(np.sqrt(np.exp(logvar.detach().numpy())))
+
+    imgs_from_mu = decoder(mu).detach()
+    imgs_from_encoding = decoder(sample).detach()
+
+    x = torchvision.utils.make_grid(torch.cat([imgs, imgs_from_mu, imgs_from_encoding], dim=0), nrow=5, pad_value=0.5)
 
     print("Reconstruction")
     plt.imshow(x.numpy().transpose((1,2,0)))
     plt.axis('off')
     plt.show()
+
+    #### Random synthesis
+    print("Random Synthesis")
+    noise_for_images_to_show = sample_noise(16, parameters["--latent-dimension"], dtype=torch.float, device=device)
+    imgs_output = decoder(noise_for_images_to_show[:16]).data.cpu()
+    fig = show_images_square(imgs_output)
+    plt.show()
+
+
+    #### Systematically varying the latents
+    print("Varying the latents")
+    def vary_latent_representation(no_latents_to_vary=10, num=9):
+        z, mu, logvar = encoder(imgs)
+        z = z[0].detach() # take first image
+        i = torch.eye(parameters["--latent-dimension"])
+
+        zvar = torch.stack([z + λ * i[d] for d in range(no_latents_to_vary) for λ in np.linspace(-5, 5, num)])
+        rx = decoder(zvar).detach()
+        rx = torchvision.utils.make_grid(rx, nrow=num, pad_value=.5)
+
+        plt.figure(figsize=(7, 7))
+        plt.imshow(rx.numpy().transpose((1, 2, 0)))
+        plt.axis('off')
+        plt.show()
+
+    vary_latent_representation()
+
+    #### Interpolation
+    def clean_interpolation(num=10):
+        z, mu, logvar = encoder(imgs)
+        z = z.detach().numpy()
+        λ = np.linspace(0, 1, num)[:, np.newaxis]
+        znew = (1 - λ) * z[1] + λ * z[3]
+        znew = torch.tensor(znew, dtype=torch.float32)
+        recon = decoder(znew).detach()
+        x = torchvision.utils.make_grid(recon, nrow=num, pad_value=.5)
+
+        plt.imshow(x.numpy().transpose((1, 2, 0)))
+        plt.show()
+
+    clean_interpolation()
+
 
 
 if __name__ == "__main__":
