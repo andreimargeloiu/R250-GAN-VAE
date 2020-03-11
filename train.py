@@ -9,8 +9,10 @@ Options:
     --epochs=INT                    Number of epochs to run [default: 15]
     --show-every=INT                Print statistics every X epochs [default: 250]
     --base-path=NAME                Path to the project folder [default: .]
+    --max-iterations=INT            [default: -1] Number of max iterations. Use when training on CPU to stop early.
 
     --batch-size=INT                [default: 128]
+    --latent-dimension=INT          [default: 128]
     --lr-vae=FLOAT                  [default: 1e-3]
     --lr-disc=FLOAT                 [default: 1e-4]
     --negative_slope=FLOAT          [default: 0.05]
@@ -19,6 +21,7 @@ Options:
 """
 import json
 import os
+import pickle
 from datetime import datetime
 from os import path
 from sys import exit
@@ -135,10 +138,10 @@ def train_dcgan(args, noise_dim=96):
             iter_count += 1
 
 
-def train_vaegan(args, latent_dimension=128):
+def train_vaegan(args):
     #### Hyperparameters
     iter_count = 0
-    noise_for_images_to_show = sample_noise(16, latent_dimension, dtype=dtype, device=device)
+    noise_for_images_to_show = sample_noise(16, args["--latent-dimension"], dtype=dtype, device=device)
 
     model_ID = datetime.now().strftime('%Y%m%d-%H%M%S')
     args['logger'].debug(f"Model id: {model_ID}")
@@ -146,10 +149,17 @@ def train_vaegan(args, latent_dimension=128):
     saved_model_dir = path.join(path.join(args['--base-path'], f"saved_models"), model_ID)
     write = SummaryWriter(log_dir=tensorboard_logdir, flush_secs=20)
 
+    # Save parameters in saved_models
+    os.mkdir(saved_model_dir)
+    args_copy = args.copy()
+    del args_copy['logger']
+    with open(path.join(saved_model_dir, 'parameters'), 'wb') as output:
+        pickle.dump(args_copy, output, protocol=pickle.HIGHEST_PROTOCOL)
+
     # Create models and initialize weights
-    encoder = Encoder(latent_dimension, device,
+    encoder = Encoder(args["--latent-dimension"], device,
                       negative_slope=args['--negative_slope']).to(device)
-    decoder = Decoder(latent_dimension,
+    decoder = Decoder(args["--latent-dimension"],
                       activation='sigmoid',
                       negative_slope=args['--negative_slope']).to(device)
     discriminator = Discriminator(negative_slope=args['--negative_slope']).to(device)
@@ -199,7 +209,7 @@ def train_vaegan(args, latent_dimension=128):
             ###### Compute losses ######
             L_prior = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
 
-            z_prior = Variable(torch.randn(args['--batch-size'], latent_dimension).to(device))
+            z_prior = Variable(torch.randn(args['--batch-size'], args["--latent-dimension"]).to(device))
             x_decoded_prior = decoder.forward(z_prior)
             logits_from_prior, _ = discriminator.forward(x_decoded_prior)
             y_fake = Variable(torch.zeros(logits_from_prior.size(), dtype=dtype, device=device))
@@ -248,7 +258,13 @@ def train_vaegan(args, latent_dimension=128):
 
             iter_count += 1
 
-    os.mkdir(saved_model_dir)
+            if iter_count == args['--max-iterations']:
+                encoder.save(saved_model_dir)
+                decoder.save(saved_model_dir)
+                discriminator.save(saved_model_dir)
+
+                return model_ID
+
     encoder.save(saved_model_dir)
     decoder.save(saved_model_dir)
     discriminator.save(saved_model_dir)
