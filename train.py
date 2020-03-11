@@ -253,6 +253,8 @@ def train_vaegan(args, latent_dimension=128):
     decoder.save(saved_model_dir)
     discriminator.save(saved_model_dir)
 
+    return model_ID
+
 
 def train_betavae(args, latent_dimension=64):
     betaVAE = BetaVAE(latent_dimension, device).to(device)
