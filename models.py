@@ -23,7 +23,7 @@ class BaseModel(nn.Module):
         Save the model's weights to be later restored
         """
         with gzip.open(os.path.join(save_dir_path, self.model_name), "wb") as out_file:
-            torch.save(self, out_file)
+            torch.save(self.to('cpu'), out_file)
 
     @classmethod
     def restore(cls, model_dir_path: str, model_name):
