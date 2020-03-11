@@ -248,14 +248,10 @@ def train_vaegan(args, latent_dimension=128):
 
             iter_count += 1
 
-            if iter_count == 5:
-                # Save model
-                os.mkdir(saved_model_dir)
-                encoder.save(saved_model_dir)
-                decoder.save(saved_model_dir)
-                discriminator.save(saved_model_dir)
-
-                exit()
+    os.mkdir(saved_model_dir)
+    encoder.save(saved_model_dir)
+    decoder.save(saved_model_dir)
+    discriminator.save(saved_model_dir)
 
 
 def train_betavae(args, latent_dimension=64):
