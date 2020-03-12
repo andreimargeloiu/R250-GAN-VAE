@@ -270,36 +270,110 @@ def train_vaegan(args):
 
 
 def train_betavae(args):
-    betaVAE = BetaVAE(args['--latent-dimension'], device).to(device)
-    optimizer_betaVAE = torch.optim.Adam(betaVAE.parameters(), lr=args['--lr-vae'])
-
+    #### Hyperparameters
     iter_count = 0
-    show_every = 5
-    batch_size = 128
-    noise_for_images_to_show = sample_noise(16, args['--latent-dimension'], dtype=dtype, device=device)
+    noise_for_images_to_show = sample_noise(16, args["--latent-dimension"], dtype=dtype, device=device)
+
+    model_ID = datetime.now().strftime('%Y%m%d-%H%M%S')
+    args['logger'].debug(f"Model id: {model_ID}")
+    tensorboard_logdir = path.join(args['--base-path'], f"tensorboard/scalars/{model_ID}")
+    saved_model_dir = path.join(path.join(args['--base-path'], f"saved_models"), model_ID)
+    write = SummaryWriter(log_dir=tensorboard_logdir, flush_secs=20)
+
+    # Save parameters in saved_models
+    os.mkdir(saved_model_dir)
+    args_copy = args.copy()
+    del args_copy['logger']
+    with open(path.join(saved_model_dir, 'parameters'), 'wb') as output:
+        pickle.dump(args_copy, output, protocol=pickle.HIGHEST_PROTOCOL)
+
+    # Create models and initialize weights
+    encoder = Encoder(args["--latent-dimension"], device,
+                      negative_slope=args['--negative_slope']).to(device)
+    decoder = Decoder(args["--latent-dimension"],
+                      activation='sigmoid',
+                      negative_slope=args['--negative_slope']).to(device)
+
+    # Optimizer
+    optimizer_encoder = torch.optim.Adam(encoder.parameters(), lr=args['--lr-vae'], betas=(0.5, 0.999))
+    optimizer_decoder = torch.optim.Adam(decoder.parameters(), lr=args['--lr-vae'], betas=(0.5, 0.999))
 
     for epoch in range(int(args['--epochs'])):
-        batch_iter = get_dataset_iterator(batch_size=batch_size)
+        batch_iter = get_dataset_iterator(batch_size=args['--batch-size'])
         for imgs, _ in batch_iter:
-            # Forward pass
             x_real = imgs.to(device)
-            optimizer_betaVAE.zero_grad()
-            rx, mu, logvar = betaVAE(x_real)
-            loss = BetaVAE.loss_function(rx, x_real, mu, logvar, beta=3)
+            z, mu, logvar = encoder(x_real)
+            rx = decoder(z)
+
+            optimizer_encoder.zero_grad()
+            optimizer_decoder.zero_grad()
+            loss = BetaVAE.loss_function(rx, x_real, mu, logvar, beta=args['--beta'])
             loss.backward()
-            optimizer_betaVAE.step()
+            optimizer_encoder.step()
+            optimizer_decoder.step()
 
-            if iter_count % show_every == 0:
+            #### Tensorboard
+            write.add_scalar("Loss", loss.item(), iter_count)
+
+            if iter_count % args['--show-every'] == 0:
                 print('Iter: {}, Loss: {:.4}'.format(iter_count, loss.item()))
-                # imgs_output = betaVAE.decoder(noise_for_images_to_show)
-                # show_images_square(imgs_output.data.cpu())
-                # plt.show()
+                imgs_output = decoder(noise_for_images_to_show[:16]).data.cpu()
+                fig = show_images_square(imgs_output)
+                plt.show()
+                write.add_figure(tag="Figure/Initial_noise", figure=fig, global_step=iter_count)
 
-                show_images_square(imgs[:16].data.cpu())
+                write.add_figure(tag="Figure/Reconstructed", figure=show_images_square(rx.data.cpu()[:16]),
+                                 global_step=iter_count)
                 plt.show()
-                show_images_square(rx[:16].data.cpu())
-                plt.show()
+
             iter_count += 1
+
+            if iter_count == args['--max-iterations']:
+                encoder.save(saved_model_dir)
+                decoder.save(saved_model_dir)
+
+                return model_ID
+
+    encoder.save(saved_model_dir)
+    decoder.save(saved_model_dir)
+
+    return model_ID
+
+
+
+
+# def train_betavae(args):
+#     betaVAE = BetaVAE(args['--latent-dimension'], device).to(device)
+#     optimizer_betaVAE = torch.optim.Adam(betaVAE.parameters(), lr=args['--lr-vae'])
+#
+#     iter_count = 0
+#     show_every = 5
+#     noise_for_images_to_show = sample_noise(16, args['--latent-dimension'], dtype=dtype, device=device)
+#
+#     for epoch in range(int(args['--epochs'])):
+#         batch_iter = get_dataset_iterator(batch_size=args['--batch-size'])
+#         for imgs, _ in batch_iter:
+#             # Forward pass
+#             x_real = imgs.to(device)
+#             optimizer_betaVAE.zero_grad()
+#             rx, mu, logvar = betaVAE(x_real)
+#             loss = BetaVAE.loss_function(rx, x_real, mu, logvar, beta=3)
+#             loss.backward()
+#             optimizer_betaVAE.step()
+#
+#             if iter_count % show_every == 0:
+#                 print('Iter: {}, Loss: {:.4}'.format(iter_count, loss.item()))
+#                 # imgs_output = betaVAE.decoder(noise_for_images_to_show)
+#                 # show_images_square(imgs_output.data.cpu())
+#                 # plt.show()
+#
+#                 show_images_square(imgs[:16].data.cpu())
+#                 plt.show()
+#                 show_images_square(rx[:16].data.cpu())
+#                 plt.show()
+#             iter_count += 1
+
+
 
 
 if __name__ == "__main__":
