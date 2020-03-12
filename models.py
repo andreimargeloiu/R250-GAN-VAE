@@ -131,20 +131,17 @@ class Discriminator(BaseModel):
             Unflatten(-1, 1, 28, 28),
             nn.Conv2d(1, 32, kernel_size=(5, 5), stride=1),
             nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
-            nn.BatchNorm2d(32),
             nn.MaxPool2d(kernel_size=(2, 2), stride=2),
 
             nn.Conv2d(32, 64, kernel_size=(5, 5), stride=1),
             nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
-            nn.BatchNorm2d(64),
             nn.MaxPool2d(kernel_size=(2, 2), stride=2),
             Flatten(),
+            nn.Linear(1024, 1024),
         )
 
-        self.flatten = Flatten()
-
         self.part_2 = nn.Sequential(
-            nn.Linear(1024, 1024),
+
             nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
             # nn.BatchNorm1d(1024),
             nn.Linear(1024, 1)
@@ -162,10 +159,10 @@ class Discriminator(BaseModel):
         - l_layer (None, -1) - values flattened for th el-th layer (used to compute the loss)
         """
         part_1 = self.part_1(x)
-        l_layer = self.flatten(part_1)
+        # l_layer = self.flatten(part_1)
         part_2 = self.part_2(part_1)
 
-        return part_2, l_layer
+        return part_2, part_1
 
 
 class BetaVAE(BaseModel):
