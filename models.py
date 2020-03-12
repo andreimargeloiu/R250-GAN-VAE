@@ -36,16 +36,16 @@ class Encoder(BaseModel):
 
         self.model = nn.Sequential(
             nn.Conv2d(1, 16, kernel_size=3, stride=2, padding=(1, 1)),  # (16, 14, 14)
-            nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
             nn.BatchNorm2d(16),
+            nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
 
             nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=(1, 1)),  # (32, 7, 7)
-            nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
             nn.BatchNorm2d(32),
+            nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
 
             nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=(1, 1)),  # (64, 4, 4)
-            nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
             nn.BatchNorm2d(64),
+            nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
 
             Flatten()
         )
@@ -90,17 +90,17 @@ class Decoder(BaseModel):
         # Linear -> Linear -> ConvTrans2D -> ConvTrans2D
         self.model = nn.Sequential(
             nn.Linear(noise_dim, 1024),
-            nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
             nn.BatchNorm1d(1024),
+            nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
 
             nn.Linear(1024, 7 * 7 * 128),
-            nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
             nn.BatchNorm1d(7 * 7 * 128),
+            nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
             Unflatten(-1, 128, 7, 7),
 
             nn.ConvTranspose2d(128, 64, kernel_size=(4, 4), stride=2, padding=1),
-            nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
             nn.BatchNorm2d(64),
+            nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
 
             nn.ConvTranspose2d(64, 1, kernel_size=(4, 4), stride=2, padding=1),
         )

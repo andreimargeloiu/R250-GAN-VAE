@@ -188,10 +188,7 @@ def train_vaegan(args):
     optimizer_discriminator = torch.optim.Adam(discriminator.parameters(), lr=args['--lr-disc'], betas=(0.5, 0.999))
 
     # Loss
-    criterion = nn.BCELoss()  # Binary cross entropy
-    criterion_lth = nn.L1Loss()  # For the 'content loss'
-    criterion_rec = nn.MSELoss(reduction='sum')  # MSE loss
-    criterion_kl = nn.KLDivLoss(reduction='sum')  # KL divergence
+    criterion_lth = torch.nn.BCEWithLogitsLoss(reduction='mean')
 
     for epoch in range(int(args['--epochs'])):
         batch_iter = get_dataset_iterator(batch_size=args['--batch-size'])
@@ -215,7 +212,7 @@ def train_vaegan(args):
             y_fake = Variable(torch.zeros(logits_from_prior.size(), dtype=dtype, device=device))
             L_discriminator_prior = bce_loss(logits_from_prior, y_fake)
 
-            L_llik_l = criterion_lth(l_layer_real, l_layer_fake)  # Consider the L-th layer as the last layer
+            L_llik_l = criterion_lth(l_layer_fake, l_layer_real)  # Consider the L-th layer as the last layer
 
             L_GAN = discriminator_loss(logits_real, logits_fake, dtype, device) \
                     + L_discriminator_prior
