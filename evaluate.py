@@ -41,32 +41,35 @@ def run(args):
     saved_model_dir = path.join(path.join(args['--base-path'], f"saved_models"), args['--model-id'])
     with open(path.join(saved_model_dir, 'parameters'), 'rb') as input:
         parameters = pickle.load(input)
+        print(parameters)
 
     # Restore models
     device = torch.device('cpu')
-    encoder = Encoder(parameters['--latent-dimension'], device)
+    encoder = Encoder(parameters['--latent-dimension'], device, negative_slope=parameters['--negative_slope'])
     with gzip.open(path.join(saved_model_dir, 'encoder'), "rb") as input:
         encoder.load_state_dict(torch.load(input, map_location=device))
 
-    decoder = Decoder(parameters['--latent-dimension'], activation='sigmoid')
+    decoder = Decoder(parameters['--latent-dimension'], activation='sigmoid', negative_slope=parameters['--negative_slope'])
     with gzip.open(path.join(saved_model_dir, 'decoder'), "rb") as input:
         decoder.load_state_dict(torch.load(input, map_location=device))
 
     #### Reconstruction
-    batch_iter = get_dataset_iterator(batch_size=5)
+    batch_iter = get_dataset_iterator(batch_size=10)
     imgs, _ = next(batch_iter)
 
     encoder.eval()
     decoder.eval()
 
-    sample, mu, logvar = encoder(imgs)
-    # print(mu)
-    # print(np.sqrt(np.exp(logvar.detach().numpy())))
+    z, mu, logvar = encoder(imgs)
+    recon = decoder(z).detach()
 
-    imgs_from_mu = decoder(mu).detach()
-    imgs_from_encoding = decoder(sample).detach()
+    show_images_square(imgs)
+    plt.show()
 
-    x = torchvision.utils.make_grid(torch.cat([imgs, imgs_from_mu, imgs_from_encoding], dim=0), nrow=5, pad_value=0.5)
+    show_images_square(recon)
+    plt.show()
+
+    x = torchvision.utils.make_grid(torch.cat([imgs, recon], dim=0), nrow=10, pad_value=0.5)
 
     print("Reconstruction")
     plt.imshow(x.numpy().transpose((1,2,0)))
@@ -83,9 +86,9 @@ def run(args):
 
     #### Systematically varying the latents
     print("Varying the latents")
-    def vary_latent_representation(no_latents_to_vary=10, num=9):
+    def vary_latent_representation(poz, no_latents_to_vary=10, num=9):
         z, mu, logvar = encoder(imgs)
-        z = z[0].detach() # take first image
+        z = z[poz].detach() # take first image
         i = torch.eye(parameters["--latent-dimension"])
 
         zvar = torch.stack([z + λ * i[d] for d in range(no_latents_to_vary) for λ in np.linspace(-5, 5, num)])
@@ -97,7 +100,9 @@ def run(args):
         plt.axis('off')
         plt.show()
 
-    vary_latent_representation()
+    vary_latent_representation(0)
+    vary_latent_representation(1)
+    vary_latent_representation(2)
 
     #### Interpolation
     def clean_interpolation(num=10):

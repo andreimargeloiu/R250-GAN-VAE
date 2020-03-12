@@ -210,7 +210,7 @@ def train_vaegan(args):
             x_decoded_prior = decoder.forward(z_prior)
             logits_from_prior, _ = discriminator.forward(x_decoded_prior)
             y_fake = Variable(torch.zeros(logits_from_prior.size(), dtype=dtype, device=device))
-            L_discriminator_prior = bce_loss(logits_from_prior, y_fake)
+            L_discriminator_prior = bce_loss(logits_from_prior, y_fake, reduction='mean')
 
             L_llik_l = criterion_lth(l_layer_fake, l_layer_real)  # Consider the L-th layer as the last layer
 
@@ -269,14 +269,14 @@ def train_vaegan(args):
     return model_ID
 
 
-def train_betavae(args, latent_dimension=64):
-    betaVAE = BetaVAE(latent_dimension, device).to(device)
-    optimizer_betaVAE = torch.optim.Adam(betaVAE.parameters(), lr=1e-3)
+def train_betavae(args):
+    betaVAE = BetaVAE(args['--latent-dimension'], device).to(device)
+    optimizer_betaVAE = torch.optim.Adam(betaVAE.parameters(), lr=args['--lr-vae'])
 
     iter_count = 0
-    show_every = 250
+    show_every = 5
     batch_size = 128
-    noise_for_images_to_show = sample_noise(16, latent_dimension, dtype=dtype, device=device)
+    noise_for_images_to_show = sample_noise(16, args['--latent-dimension'], dtype=dtype, device=device)
 
     for epoch in range(int(args['--epochs'])):
         batch_iter = get_dataset_iterator(batch_size=batch_size)
@@ -291,11 +291,13 @@ def train_betavae(args, latent_dimension=64):
 
             if iter_count % show_every == 0:
                 print('Iter: {}, Loss: {:.4}'.format(iter_count, loss.item()))
-                imgs_output = betaVAE.decoder(noise_for_images_to_show)
-                show_images_square(imgs_output.data.cpu())
-                plt.show()
+                # imgs_output = betaVAE.decoder(noise_for_images_to_show)
+                # show_images_square(imgs_output.data.cpu())
+                # plt.show()
 
-                show_images_square(rx.data.cpu())
+                show_images_square(imgs[:16].data.cpu())
+                plt.show()
+                show_images_square(rx[:16].data.cpu())
                 plt.show()
             iter_count += 1
 
