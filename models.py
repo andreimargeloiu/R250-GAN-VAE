@@ -131,12 +131,12 @@ class Discriminator(BaseModel):
             Unflatten(-1, 1, 28, 28),
             nn.Conv2d(1, 32, kernel_size=(5, 5), stride=1),
             nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
-            # nn.BatchNorm2d(32),
+            nn.BatchNorm2d(32),
             nn.MaxPool2d(kernel_size=(2, 2), stride=2),
 
             nn.Conv2d(32, 64, kernel_size=(5, 5), stride=1),
             nn.LeakyReLU(negative_slope=negative_slope, inplace=True),
-            # nn.BatchNorm2d(64),
+            nn.BatchNorm2d(64),
             nn.MaxPool2d(kernel_size=(2, 2), stride=2),
             Flatten(),
         )
